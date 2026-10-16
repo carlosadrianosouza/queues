@@ -5,7 +5,7 @@ on:
     branches: ["**"]
     paths:
       - "aws/terraform/accounts/voomp/**"
-      - "aws/terraform/accounts/modules/**"
+      #- "aws/terraform/accounts/modules/**"
   pull_request:
     branches: [main]
     paths:
