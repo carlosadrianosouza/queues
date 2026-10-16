@@ -10,7 +10,7 @@ on:
     branches: [main]
     paths:
       - "aws/terraform/accounts/voomp/**"
-      - "aws/terraform/accounts/modules/**"
+      #- "aws/terraform/accounts/modules/**"
   workflow_dispatch:
     inputs:
       environment:
