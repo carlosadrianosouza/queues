@@ -46,7 +46,7 @@ locals {
       functionType = "Medium0"
       appName      = "fn-voomp-prd-medium-bs-0"
       memorySize   = 256
-      timeout      = 30
+      timeout      = 35
       queues = [
         # "back-ambassador-indication-last-days",
         # "back-ambassador-remove-finisheds-indicated",
