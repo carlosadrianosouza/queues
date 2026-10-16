@@ -49,7 +49,7 @@ locals {
       memorySize   = 256
       timeout      = 30
       queues = [
-        "back-ambassador-indication-last-days",
+        #"back-ambassador-indication-last-days",
         # "back-ambassador-remove-finisheds-indicated",
         # "back-remove-admin-logs",
         # "back-club",
