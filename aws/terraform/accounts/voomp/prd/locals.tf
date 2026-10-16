@@ -1,4 +1,4 @@
-/*
+
 locals {
   common_tags = {
     Environment = var.environment
@@ -65,7 +65,7 @@ locals {
         # "messages-whatsapp-send",
         # "play-media-transform",
         # "play-members-import",
-        "play-members-product",
+        #"play-members-product",
       ]
     },
     {
@@ -85,7 +85,7 @@ locals {
         # "back-lead-update",
         # "back-pagarme",
         # "play-callback",
-        "play-cogna-ai",
+        #"play-cogna-ai",
       ]
     },
     {
@@ -102,7 +102,7 @@ locals {
         # "back-notas-emit",
         # "back-retorno-notas",
         # "back-reconcile",
-        "back-reconcile-import-process-transactions",
+        #"back-reconcile-import-process-transactions",
       ]
     },
   ]
@@ -130,4 +130,4 @@ locals {
 
   sqs_queues_map = { for q in local.sqs_queues_flattened : q.queue_name => q }
 }
-*/
+
