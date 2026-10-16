@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket       = "seller-greenn-queues-tfstate-prd-884234864882-us-east-1-an"
+    bucket       = "seller-greenn-queues-tfstate-prd-131676642773-us-east-1-an"
     use_lockfile = true
     key          = "prd/terraform.tfstate"
     region       = "us-east-1"
