@@ -1,4 +1,4 @@
-/*
+
 locals {
   common_tags = {
     Environment = var.environment
@@ -122,4 +122,4 @@ locals {
 
   sqs_queues_map = { for q in local.sqs_queues_flattened : q.queue_name => q }
 }
-*/
+
