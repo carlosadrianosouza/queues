@@ -1,5 +1,5 @@
 # --- Secrets Manager ---
-/*
+
 data "aws_secretsmanager_secret" "credentials" {
   name = var.secret_name
 }
@@ -92,4 +92,3 @@ module "api_gateway" {
   authorizer_invoke_arn   = module.authorizer.invoke_arn
   tags                    = local.common_tags
 }
-*/
