@@ -10,7 +10,7 @@ locals {
     {
       functionType = "Low0"
       appName      = "fn-voomp-dev-low-us-0"
-      memorySize   = 128
+      memorySize   = 130
       timeout      = 30
       queues = [
         "back-affiliates",
