@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "rootDir": "./",
+    "outDir": "../dist/src",
+    "sourceMap": false,
+    "removeComments": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "./handlers/**/*",
+    "./config/**/*",
+    "./helpers/api/**/*",
+    "./helpers/logger/**/*",
+    "./helpers/getEnv.ts",
+    "./helpers/getGroupByfunctionName.ts",
+    "./helpers/getGroupByEventSource.ts",
+    "./exceptions/**/*",
+    "./authorizer/**/*",
+    "./@types/**/*",
+    "./MessageConsumer.ts"
+  ],
+  "exclude": [
+    "./**/*.spec.ts",
+    "./**/*.test.ts"
+  ]
+}

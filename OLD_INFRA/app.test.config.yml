@@ -1,0 +1,27 @@
+parameters:
+  - name: fnApps
+    type: object
+    default:
+      - functionType: Low0
+        appName: fn-voomp-test-low-eu-0
+        hostConfigFile: host-default.json
+        queues:
+          - back-test
+          - play-test
+          - gateway-test
+
+      - functionType: Medium0
+        appName: fn-voomp-test-medium-eu-0
+        fnAppHostPath: host-default.json
+        queues:
+          - back-test2
+          - play-test2
+          - gateway-test2
+
+      - functionType: High0
+        appName: fn-voomp-test-high-eu-0
+        fnAppHostPath: host-default.json
+        queues:
+          - back-test3
+          - play-test3
+          - gateway-test3

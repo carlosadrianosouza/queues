@@ -1,0 +1,40 @@
+{
+  "name": "voomp-creators-queues",
+  "version": "1.11.0",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest --run --coverage",
+    "test:watch": "vitest",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.150",
+    "@types/lodash": "^4.14.191",
+    "@types/luxon": "^3.2.0",
+    "@types/node": "18.x",
+    "@types/uuid": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.50.0",
+    "@typescript-eslint/parser": "^5.50.0",
+    "@vitest/coverage-c8": "^0.28.5",
+    "@vitest/coverage-istanbul": "^0.28.5",
+    "eslint": "^8.33.0",
+    "typescript": "^4.9.5",
+    "vitest": "^0.28.4"
+  },
+  "dependencies": {
+    "aws-lambda": "^1.0.7",
+    "axios": "^1.2.4",
+    "colors": "^1.4.0",
+    "dotenv": "^16.0.3",
+    "lodash": "^4.17.21",
+    "luxon": "^3.2.1",
+    "uuid": "^9.0.0",
+    "yaml": "^2.4.1",
+    "zod": "^3.20.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}

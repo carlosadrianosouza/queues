@@ -1,0 +1,101 @@
+parameters:
+  - name: fnApps
+    type: object
+    default:
+      - functionType: Low0
+        appName: fn-voomp-prd-low-bs-0
+        hostConfigFile: host-default.json
+        queues:
+          - back-affiliates
+          - back-analysis
+          - back-call-evaluation
+          - back-capi
+          - back-contract
+          - back-google-sheet
+          - back-heartbeat
+          - back-infusionsoft
+          - back-notification
+          - back-paypal
+          - back-possale
+          - back-postback-gateway
+          - back-receipt
+          - back-refunded-subscription
+          - back-sale-event
+          - back-smart-sale
+          - back-test
+          - back-voxuy
+          - gateway-test
+          - messages-test
+          - play-certificate
+          - play-members
+          - play-members-copy
+          - play-members-delete
+          - play-members-export
+          - play-members-subscription
+          - play-test
+
+      - functionType: Medium0
+        appName: fn-voomp-prd-medium-bs-0
+        hostConfigFile: host-default.json
+        queues:
+          - back-ambassador-indication-last-days
+          - back-ambassador-remove-finisheds-indicated
+          - back-remove-admin-logs
+          - back-club
+          - back-export
+          - back-export-check
+          - back-export-upcoming-invoices
+          - back-payment
+          - back-pix
+          - back-webhook
+          - back-release
+          - gateway-register
+          - gateway-send
+          - messages-gwhats-send
+          - messages-whatsapp-send
+          - play-media-transform
+          - play-members-import
+          - play-members-product
+
+      - functionType: High0
+        appName: fn-voomp-prd-high-bs-0
+        hostConfigFile: host-default.json
+        queues:
+          - back-antecipation
+          - back-antifraude
+          - back-antifraude-geoip
+          - back-callback
+          - back-lead
+          - back-lead-abandon
+          - back-lead-checkout
+          - back-lead-store
+          - back-lead-update
+          - back-pagarme
+          - play-callback
+          - play-cogna-ai
+
+      - functionType: High1
+        appName: fn-voomp-prd-high-bs-1
+        hostConfigFile: host-default.json
+        queues:
+          - play-email
+          - back-email
+          - messages-receive
+          - messages-email-send
+          - back-notas
+          - back-notas-emit
+          - back-retorno-notas
+          - back-reconcile
+          - back-reconcile-import-process-transactions
+
+      - functionType: High2
+        appName: fn-voomp-prd-high-bs-2
+        hostConfigFile: host-default.json
+
+      - functionType: High3
+        appName: fn-voomp-prd-high-bs-3
+        hostConfigFile: host-default.json
+
+      - functionType: High4
+        appName: fn-voomp-prd-high-bs-4
+        hostConfigFile: host-default.json

@@ -1,0 +1,83 @@
+parameters:
+  - name: fnApps
+    type: object
+    default:
+      - functionType: Low0
+        appName: fn-voomp-hml-low-eu-0
+        hostConfigFile: host-default.json
+        queues:
+          - back-affiliates
+          - back-analysis
+          - back-call-evaluation
+          - back-capi
+          - back-contract
+          - back-google-sheet
+          - back-heartbeat
+          - back-infusionsoft
+          - back-notification
+          - back-paypal
+          - back-possale
+          - back-postback-gateway
+          - back-receipt
+          - back-refunded-subscription
+          - back-release
+          - back-sale-event
+          - back-smart-sale
+          - back-test
+          - back-voxuy
+          - gateway-test
+          - messages-test
+          - play-certificate
+          - play-members
+          - play-members-copy
+          - play-members-delete
+          - play-members-export
+          - play-members-subscription
+          - play-test
+
+      - functionType: Medium0
+        appName: fn-voomp-hml-medium-eu-0
+        hostConfigFile: host-default.json
+        queues:
+          - back-ambassador-indication-last-days
+          - back-ambassador-remove-finisheds-indicated
+          - back-remove-admin-logs
+          - back-club
+          - back-export
+          - back-export-check
+          - back-export-upcoming-invoices
+          - back-payment
+          - back-pix
+          - back-webhook
+          - gateway-register
+          - gateway-send
+          - messages-gwhats-send
+          - messages-whatsapp-send
+          - play-media-transform
+          - play-members-import
+          - play-members-product
+
+      - functionType: High0
+        appName: fn-voomp-hml-high-eu-0
+        hostConfigFile: host-default.json
+        queues:
+          - back-antecipation
+          - back-antifraude
+          - back-antifraude-geoip
+          - back-callback
+          - back-email
+          - back-lead
+          - back-lead-abandon
+          - back-lead-checkout
+          - back-lead-store
+          - back-lead-update
+          - back-notas
+          - back-notas-emit
+          - back-pagarme
+          - back-reconcile
+          - back-reconcile-import-process-transactions
+          - back-retorno-notas
+          - messages-email-send
+          - messages-receive
+          - play-callback
+          - play-email

@@ -1,0 +1,19 @@
+{
+  "branches": ["main"],
+  "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/changelog",
+      "semantic-release-ado",
+      ["@semantic-release/npm", {
+        "npmPublish": false
+      }],
+      ["@semantic-release/git", {
+          "assets": ["package.json", "CHANGELOG.md"],
+          "message": "Bump version: ${nextRelease.version} \n\n${nextRelease.notes}"
+      }],
+      ["@semantic-release/exec", {
+        "prepareCmd": "echo '::set-output name=VERSION::${nextRelease.version}'"
+      }]
+  ]
+}

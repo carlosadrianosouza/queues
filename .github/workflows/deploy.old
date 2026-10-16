@@ -1,0 +1,162 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main, dev, hml]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "18"
+  NPM_VERSION: "10.7.0"
+  AWS_REGION: "us-east-1"
+
+jobs:
+  determine-stage:
+    runs-on: ubuntu-latest
+    outputs:
+      stage: ${{ steps.set-stage.outputs.stage }}
+    steps:
+      - name: Set stage based on branch
+        id: set-stage
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "stage=prd" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/hml" ]]; then
+            echo "stage=hml" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            echo "stage=dev" >> $GITHUB_OUTPUT
+          else
+            echo "stage=dev" >> $GITHUB_OUTPUT
+          fi
+
+  process-config:
+    needs: determine-stage
+    runs-on: ubuntu-latest
+    outputs:
+      functions: ${{ steps.get-functions.outputs.functions }}
+      stage: ${{ needs.determine-stage.outputs.stage }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Get functions from config
+        id: get-functions
+        run: |
+          FUNCTIONS=$(node scripts/process-config.js functions ${{ needs.determine-stage.outputs.stage }})
+          echo "functions=$FUNCTIONS" >> $GITHUB_OUTPUT
+
+  deploy-function:
+    needs: [determine-stage, process-config]
+    environment: ${{ needs.process-config.outputs.stage }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        function: ${{ fromJson(needs.process-config.outputs.functions) }}
+      fail-fast: false
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install npm@${{ env.NPM_VERSION }}
+        run: npm install -g npm@${{ env.NPM_VERSION }}
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      # - name: Run ESLint
+      #   run: npm run lint
+
+      # TODO: Descomentar
+      # - name: Run Tests
+      #   run: npm run test
+
+      - name: Install AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/seller-greenn-queues-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create environment file
+        run: |
+          echo "STAGE=${{ vars.STAGE }}" >> .env
+          echo "APP_NAME=${{ matrix.function.appName }}" >> .env
+          echo "AWS_REGION=${{ vars.AWS_REGION }}" >> .env
+          echo "AWS_LAYER_BUCKET=${{ vars.AWS_LAYER_BUCKET }}" >> .env
+          echo "LOCAL_PORT=${{ vars.LOCAL_PORT }}" >> .env
+          echo "AWS_ARTIFACTS_BUCKET=${{ vars.AWS_ARTIFACTS_BUCKET }}" >> .env
+          echo "AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID }}" >> .env
+          echo "TOKEN=${{ secrets.TOKEN }}" >> .env
+          echo "CONSUMER_URL_BACK=${{ secrets.CONSUMER_URL_BACK }}" >> .env
+          echo "CONSUMER_URL_PLAY=${{ secrets.CONSUMER_URL_PLAY }}" >> .env
+          echo "CONSUMER_URL_MESSAGES=${{ secrets.CONSUMER_URL_MESSAGES }}" >> .env
+          echo "CONSUMER_URL_GATEWAY=${{ secrets.CONSUMER_URL_GATEWAY }}" >> .env
+
+      - name: Build TypeScript
+        run: npm run build:typescript -- --outDir dist/${{ matrix.function.appName }}
+
+      - name: Generate SAM template for function
+        run: |
+          # Criar template específico para esta função
+          node generate-sam-template.js ${{ needs.process-config.outputs.stage }} ${{ matrix.function.appName }}
+
+      - name: Build SAM application
+        run: sam build
+
+      - name: Deploy function to AWS
+        run: |
+          sam deploy \
+            --stack-name seller-greenn-queues-${{ needs.process-config.outputs.stage }}-${{ matrix.function.functionType }} \
+            --s3-bucket ${{ vars.AWS_ARTIFACTS_BUCKET }} \
+            --capabilities CAPABILITY_IAM \
+            --parameter-overrides LayerBucket=${{ vars.AWS_LAYER_BUCKET }} \
+            --no-fail-on-empty-changeset
+
+      - name: Upload deployment artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-artifacts-${{ needs.process-config.outputs.stage }}-${{ matrix.function.functionType }}
+          path: |
+            .aws-sam/
+            template.yaml
+          retention-days: 30
+
+  # Job de resumo final
+  deployment-summary:
+    needs: [process-config, deploy-function]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Stage:** ${{ needs.process-config.outputs.stage }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Functions Deployed:" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          echo '${{ needs.process-config.outputs.functions }}' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+ 

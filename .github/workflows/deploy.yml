@@ -1,0 +1,313 @@
+name: Deploy Infrastructure (Terraform)
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "aws/terraform/accounts/voomp/**"
+      - "aws/terraform/accounts/modules/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "aws/terraform/accounts/voomp/**"
+      - "aws/terraform/accounts/modules/**"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy (dev, dev1, hml, prd)"
+        required: true
+        type: choice
+        options:
+          - dev
+          - dev1
+          - hml
+          - prd
+
+env:
+  NODE_VERSION: "18"
+  TF_VERSION: "1.10.0"
+  TF_BASE_DIR: "aws/terraform/accounts/voomp"
+
+jobs:
+  # --- Determina ambiente(s) e modo (plan-only vs plan+apply) ---
+  set-env:
+    runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.env.outputs.environments }}
+      apply: ${{ steps.env.outputs.apply }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Determine environments and mode
+        id: env
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          EVENT="${{ github.event_name }}"
+          TF_BASE_DIR="${{ env.TF_BASE_DIR }}"
+
+          # Function: detect changed environment directories
+          detect_changed_envs() {
+            local BASE="$1"
+            local HEAD="$2"
+
+            local CHANGED=$(git diff --name-only "$BASE" "$HEAD" | grep "^${TF_BASE_DIR}/" | sed "s|${TF_BASE_DIR}/||" | cut -d'/' -f1 | sort -u | grep -v "^modules$")
+
+            # If shared modules changed, all environments need processing
+            if git diff --name-only "$BASE" "$HEAD" | grep -q "^aws/terraform/accounts/modules/"; then
+              CHANGED=$(ls -d ${TF_BASE_DIR}/*/ 2>/dev/null | sed "s|${TF_BASE_DIR}/||;s|/||" | grep -v "^modules$" | tr '\n' ' ')
+            fi
+
+            # Filter to valid directories only
+            local VALID=""
+            for e in $CHANGED; do
+              if [ -d "${TF_BASE_DIR}/$e" ]; then
+                VALID="$VALID $e"
+              fi
+            done
+            echo $(echo "$VALID" | xargs)
+          }
+
+          if [ "$EVENT" == "workflow_dispatch" ]; then
+            # Manual trigger: plan + apply
+            ENVS='["${{ inputs.environment }}"]'
+            APPLY="true"
+
+          elif [ "$EVENT" == "pull_request" ]; then
+            # PR: detect changed envs, plan-only
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+            VALID_ENVS=$(detect_changed_envs "$BASE" "$HEAD")
+
+            if [ -z "$VALID_ENVS" ]; then
+              ENVS="[]"
+            else
+              ENVS=$(echo "$VALID_ENVS" | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            fi
+            APPLY="false"
+
+          elif [ "$BRANCH" == "main" ]; then
+            # Push to main: detect changed envs, plan + apply
+            BASE=$(git rev-parse HEAD~1 2>/dev/null || git rev-list --max-parents=0 HEAD)
+            VALID_ENVS=$(detect_changed_envs "$BASE" "HEAD")
+
+            if [ -z "$VALID_ENVS" ]; then
+              ENVS="[]"
+            else
+              ENVS=$(echo "$VALID_ENVS" | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            fi
+            APPLY="true"
+
+          else
+            # Any other branch: detect changed envs, plan-only
+            BASE=$(git merge-base origin/main HEAD 2>/dev/null || echo "HEAD~1")
+            VALID_ENVS=$(detect_changed_envs "$BASE" "HEAD")
+
+            if [ -z "$VALID_ENVS" ]; then
+              ENVS="[]"
+            else
+              ENVS=$(echo "$VALID_ENVS" | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            fi
+            APPLY="false"
+          fi
+
+          echo "environments=$ENVS" >> $GITHUB_OUTPUT
+          echo "apply=$APPLY" >> $GITHUB_OUTPUT
+          echo "🔍 Branch: $BRANCH"
+          echo "🔍 Event: $EVENT"
+          echo "🔍 Environments: $ENVS"
+          echo "🔍 Apply: $APPLY"
+
+  # --- Build + Plan + Deploy per environment ---
+  deploy:
+    needs: [set-env]
+    if: needs.set-env.outputs.environments != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: ${{ fromJson(needs.set-env.outputs.environments) }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build Lambda code
+        working-directory: ${{ env.TF_BASE_DIR }}/${{ matrix.environment }}
+        run: |
+          echo "📦 Installing dependencies..."
+          cd src
+          npm install --legacy-peer-deps
+
+          echo "🔨 Compiling TypeScript..."
+          npx tsc
+
+          echo "✅ Build complete: dist/"
+
+      - name: Prepare Lambda layer
+        working-directory: ${{ env.TF_BASE_DIR }}/${{ matrix.environment }}
+        run: |
+          echo "📦 Preparing Lambda layer..."
+          mkdir -p layer/nodejs
+          cp src/package.json layer/nodejs/
+          cd layer/nodejs
+          npm install --omit dev --legacy-peer-deps
+
+          echo "✅ Layer ready: layer/nodejs/node_modules/"
+
+      - name: Set AWS Account ID and Region
+        run: |
+          ENV_UPPER=$(echo "${{ matrix.environment }}" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+
+          ACCOUNT_ID_VAR="${ENV_UPPER}_AWS_ACCOUNT_ID"
+          ACCOUNT_ID="${!ACCOUNT_ID_VAR}"
+
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "::error::Secret '${ACCOUNT_ID_VAR}' not found in repository secrets."
+            exit 1
+          fi
+
+          echo "AWS_ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
+
+          REGION_VAR="${ENV_UPPER}_AWS_REGION"
+          REGION="${!REGION_VAR:-us-east-1}"
+          echo "AWS_REGION=$REGION" >> $GITHUB_ENV
+
+          echo "✅ Account: ***${ACCOUNT_ID: -4} | Region: $REGION"
+        env:
+          DEV_AWS_ACCOUNT_ID: ${{ secrets.DEV_AWS_ACCOUNT_ID }}
+          DEV1_AWS_ACCOUNT_ID: ${{ secrets.DEV1_AWS_ACCOUNT_ID }}
+          DEV2_AWS_ACCOUNT_ID: ${{ secrets.DEV2_AWS_ACCOUNT_ID }}
+          DEV3_AWS_ACCOUNT_ID: ${{ secrets.DEV3_AWS_ACCOUNT_ID }}
+          HML_AWS_ACCOUNT_ID: ${{ secrets.HML_AWS_ACCOUNT_ID }}
+          PRD_AWS_ACCOUNT_ID: ${{ secrets.PRD_AWS_ACCOUNT_ID }}
+          DEV_AWS_REGION: ${{ secrets.DEV_AWS_REGION }}
+          DEV1_AWS_REGION: ${{ secrets.DEV1_AWS_REGION }}
+          HML_AWS_REGION: ${{ secrets.HML_AWS_REGION }}
+          PRD_AWS_REGION: ${{ secrets.PRD_AWS_REGION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/seller-greenn-queues-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Verify build artifacts
+        working-directory: ${{ env.TF_BASE_DIR }}/${{ matrix.environment }}
+        run: |
+          if [ ! -d "dist" ] || [ ! -d "layer/nodejs" ]; then
+            echo "::error::Build artifacts not found. Ensure dist/ and layer/nodejs/ exist."
+            exit 1
+          fi
+          echo "✅ Build artifacts verified"
+          echo "   dist/ files: $(find dist -type f | wc -l)"
+          echo "   layer/ size: $(du -sh layer | cut -f1)"
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_BASE_DIR }}/${{ matrix.environment }}
+        run: terraform init
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: ${{ env.TF_BASE_DIR }}/${{ matrix.environment }}
+        run: |
+          terraform plan \
+            -var="account_id=${{ env.AWS_ACCOUNT_ID }}" \
+            -out=tfplan \
+            -no-color 2>&1 | tee plan_output.txt
+
+      - name: Comment Plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('${{ env.TF_BASE_DIR }}/${{ matrix.environment }}/plan_output.txt', 'utf8');
+
+            const maxLength = 60000;
+            const truncated = planOutput.length > maxLength
+              ? planOutput.substring(0, maxLength) + '\n\n... (truncado)'
+              : planOutput;
+
+            const body = `## 📋 Terraform Plan - \`${{ matrix.environment }}\`
+
+            <details>
+            <summary>Clique para ver o plan</summary>
+
+            \`\`\`
+            ${truncated}
+            \`\`\`
+
+            </details>
+
+            **Trigger:** \`${{ github.event_name }}\` | **Branch:** \`${{ github.ref_name }}\` | **Apply:** \`${{ needs.set-env.outputs.apply }}\`
+            `;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' &&
+              c.body.includes(`Terraform Plan - \`${{ matrix.environment }}\``)
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
+
+      - name: Terraform Apply
+        if: needs.set-env.outputs.apply == 'true'
+        working-directory: ${{ env.TF_BASE_DIR }}/${{ matrix.environment }}
+        run: terraform apply -auto-approve tfplan
+
+  # --- Summary ---
+  deployment-summary:
+    needs: [set-env, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environments:** ${{ needs.set-env.outputs.environments }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Apply:** ${{ needs.set-env.outputs.apply }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Result:** ${{ needs.deploy.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.set-env.outputs.apply }}" != "true" ]; then
+            echo "ℹ️ **Plan only** - Apply runs only on main branch or via workflow_dispatch" >> $GITHUB_STEP_SUMMARY
+          fi

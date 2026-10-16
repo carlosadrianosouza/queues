@@ -1,0 +1,26 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
+  "globals": {
+    "NodeJS": true
+  },
+  "rules": {
+    "camelcase": "off",
+    "semi": ["error", "never"],
+    "yield-star-spacing": "off",
+    "quotes": ["error", "single"],
+    "generator-star-spacing": "off",
+    "space-before-function-paren": "off",
+    "import/prefer-default-export": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "comma-dangle": ["error", "always-multiline"],
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "_"
+      }
+    ]
+  }
+}
